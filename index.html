@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>tomate2.0 Web</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-content">
+      <h1>Bienvenue sur mon site web</h1>
+      <button id="themeToggle" class="theme-toggle">Mode sombre</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="posts-section container" id="posts">
+      <div class="posts-header">
+        <div>
+          <h2>Posts de tomate2.0</h2>
+          <p>Seul l’admin peut créer un post.</p>
+        </div>
+        <button id="adminToggle" class="button button-secondary">Accès admin</button>
+      </div>
+
+      <div id="adminPanel" class="admin-panel hidden">
+        <div class="admin-login">
+          <label for="adminPassword">Mot de passe admin</label>
+          <input id="adminPassword" type="password" placeholder="Mot de passe admin" />
+          <button type="button" id="adminLoginButton" class="button">Se connecter</button>
+        </div>
+
+        <div id="postFormContainer" class="post-form hidden">
+          <h3>Créer un nouveau post</h3>
+          <label for="postTitle">Titre</label>
+          <input id="postTitle" type="text" placeholder="Titre du post" />
+
+          <label for="postText">Texte</label>
+          <textarea id="postText" rows="4" placeholder="Ton message..."></textarea>
+
+          <label for="postMediaType">Type de média</label>
+          <select id="postMediaType">
+            <option value="none">Aucun</option>
+            <option value="image">Image</option>
+            <option value="video">Vidéo</option>
+          </select>
+
+          <label for="postMediaUrl">URL de l'image ou de la vidéo</label>
+          <input id="postMediaUrl" type="url" placeholder="https://..." />
+
+          <button type="button" id="addPostButton" class="button">Ajouter le post</button>
+          <p class="admin-hint">.</p>
+        </div>
+      </div>
+
+      <div id="postsGrid" class="posts-grid"></div>
+    </section>
+
+    <section class="contact container" id="contact">
+      <div>
+        <h2>Contactez-moi</h2>
+        <p>Envoyez un message au créateur du site.</p>
+      </div>
+      <div id="contactLogin" class="contact-login">
+        <p>Connectez-vous d'abord avec un compte Google pour pouvoir envoyer un message.</p>
+        <div id="googleSignin"></div>
+        <p id="googleStatus" class="contact-status"></p>
+      </div>
+      <form id="contactForm" class="hidden">
+        <label for="name">Nom</label>
+        <input id="name" type="text" placeholder="Votre nom" />
+
+        <label for="message">Message</label>
+        <textarea id="message" rows="5" placeholder="Votre demande..."></textarea>
+
+        <button type="button" id="sendButton" class="button">Envoyer</button>
+      </form>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <p>© 2026 tomate2.0 Web. tout droit réservé.</p>
+  </footer>
+
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
