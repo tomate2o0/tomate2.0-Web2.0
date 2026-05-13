@@ -41,8 +41,55 @@ function savePosts() {
   localStorage.setItem('sitePosts', JSON.stringify(posts));
 }
 
+let firestoreReady = false;
+let db = null;
+let postsCollection = null;
+
 function saveLikedPosts() {
   localStorage.setItem('likedPosts', JSON.stringify(likedPosts));
+}
+
+function initFirebase() {
+  const firebaseConfig = {
+    apiKey: 'YOUR_API_KEY',
+    authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
+    projectId: 'YOUR_PROJECT_ID',
+    storageBucket: 'YOUR_PROJECT_ID.appspot.com',
+    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+    appId: 'YOUR_APP_ID'
+  };
+  try {
+    firebase.initializeApp(firebaseConfig);
+    db = firebase.firestore();
+    postsCollection = db.collection('posts');
+    firestoreReady = true;
+    subscribePosts();
+  } catch (error) {
+    console.warn('Firebase n\'a pas pu être initialisé :', error);
+  }
+}
+
+function subscribePosts() {
+  if (!firestoreReady) return;
+  postsCollection.orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+    posts = [];
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      posts.push({
+        id: doc.id,
+        title: data.title || '',
+        text: data.text || '',
+        mediaType: data.mediaType || 'none',
+        mediaUrl: data.mediaUrl || '',
+        likes: typeof data.likes === 'number' ? data.likes : 0,
+        createdAt: data.createdAt || ''
+      });
+    });
+    savePosts();
+    renderPosts();
+  }, error => {
+    console.error('Erreur Firestore posts :', error);
+  });
 }
 
 function checkContactLogin() {
@@ -216,6 +263,16 @@ function addPost() {
 
   if (editingPostId) {
     // Modification d'un post existant
+    if (firestoreReady) {
+      postsCollection.doc(editingPostId).update({
+        title,
+        text,
+        mediaType,
+        mediaUrl,
+      }).catch(error => {
+        console.error('Erreur mise à jour post Firestore :', error);
+      });
+    }
     const postIndex = posts.findIndex(p => p.id === editingPostId);
     if (postIndex !== -1) {
       posts[postIndex] = {
@@ -230,6 +287,18 @@ function addPost() {
     document.getElementById('addPostButton').textContent = 'Ajouter le post';
   } else {
     // Création d'un nouveau post
+    if (firestoreReady) {
+      postsCollection.add({
+        title,
+        text,
+        mediaType,
+        mediaUrl,
+        likes: 0,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }).catch(error => {
+        console.error('Erreur création post Firestore :', error);
+      });
+    }
     const newPost = {
       id: Date.now().toString(),
       title,
@@ -357,4 +426,7 @@ renderPosts();
 updateButtonText();
 checkContactLogin();
 
-window.addEventListener('load', initGoogleSignIn);
+window.addEventListener('load', () => {
+  initGoogleSignIn();
+  initFirebase();
+});
