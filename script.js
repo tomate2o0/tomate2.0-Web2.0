@@ -45,19 +45,16 @@ let firestoreReady = false;
 let db = null;
 let postsCollection = null;
 
-function saveLikedPosts() {
-  localStorage.setItem('likedPosts', JSON.stringify(likedPosts));
-}
-
 function initFirebase() {
   const firebaseConfig = {
-    apiKey: 'YOUR_API_KEY',
-    authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_PROJECT_ID.appspot.com',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    appId: 'YOUR_APP_ID'
+    apiKey: "AIzaSyD1MwdQALxSR63rPYVch_p3j-0FrgWOJ04",
+    authDomain: "mon-site-web-ec48a.firebaseapp.com",
+    projectId: "mon-site-web-ec48a",
+    storageBucket: "mon-site-web-ec48a.firebasestorage.app",
+    messagingSenderId: "609638615194",
+    appId: "1:609638615194:web:427b4ad948931e7481b723"
   };
+
   try {
     firebase.initializeApp(firebaseConfig);
     db = firebase.firestore();
@@ -90,6 +87,10 @@ function subscribePosts() {
   }, error => {
     console.error('Erreur Firestore posts :', error);
   });
+}
+
+function saveLikedPosts() {
+  localStorage.setItem('likedPosts', JSON.stringify(likedPosts));
 }
 
 function checkContactLogin() {
@@ -263,16 +264,6 @@ function addPost() {
 
   if (editingPostId) {
     // Modification d'un post existant
-    if (firestoreReady) {
-      postsCollection.doc(editingPostId).update({
-        title,
-        text,
-        mediaType,
-        mediaUrl,
-      }).catch(error => {
-        console.error('Erreur mise à jour post Firestore :', error);
-      });
-    }
     const postIndex = posts.findIndex(p => p.id === editingPostId);
     if (postIndex !== -1) {
       posts[postIndex] = {
@@ -282,23 +273,21 @@ function addPost() {
         mediaType,
         mediaUrl,
       };
+      if (firestoreReady) {
+        postsCollection.doc(editingPostId).update({
+          title,
+          text,
+          mediaType,
+          mediaUrl,
+        }).catch(error => {
+          console.error('Erreur mise à jour post Firestore :', error);
+        });
+      }
     }
     editingPostId = null;
     document.getElementById('addPostButton').textContent = 'Ajouter le post';
   } else {
     // Création d'un nouveau post
-    if (firestoreReady) {
-      postsCollection.add({
-        title,
-        text,
-        mediaType,
-        mediaUrl,
-        likes: 0,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      }).catch(error => {
-        console.error('Erreur création post Firestore :', error);
-      });
-    }
     const newPost = {
       id: Date.now().toString(),
       title,
@@ -309,6 +298,18 @@ function addPost() {
       createdAt: new Date().toISOString(),
     };
     posts.unshift(newPost);
+    if (firestoreReady) {
+      postsCollection.doc(newPost.id).set({
+        title,
+        text,
+        mediaType,
+        mediaUrl,
+        likes: 0,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      }).catch(error => {
+        console.error('Erreur création post Firestore :', error);
+      });
+    }
   }
 
   savePosts();
@@ -337,6 +338,11 @@ function startEditPost(postId) {
 function deletePost(postId) {
   if (confirm('Êtes-vous sûr de vouloir supprimer ce post ?')) {
     posts = posts.filter(p => p.id !== postId);
+    if (firestoreReady) {
+      postsCollection.doc(postId).delete().catch(error => {
+        console.error('Erreur suppression post Firestore :', error);
+      });
+    }
     savePosts();
     renderPosts();
   }
@@ -352,6 +358,11 @@ function toggleLike(postId) {
   } else {
     likedPosts.push(postId);
     post.likes++;
+  }
+  if (firestoreReady) {
+    postsCollection.doc(postId).update({ likes: post.likes }).catch(error => {
+      console.error('Erreur mise à jour likes Firestore :', error);
+    });
   }
   savePosts();
   saveLikedPosts();
