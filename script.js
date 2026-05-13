@@ -10,6 +10,28 @@ const contactLogin = document.getElementById('contactLogin');
 const contactForm = document.getElementById('contactForm');
 const googleSignin = document.getElementById('googleSignin');
 const googleStatus = document.getElementById('googleStatus');
+const aiToggle = document.getElementById('aiToggle');
+const aiChatPanel = document.getElementById('aiChatPanel');
+const aiClose = document.getElementById('aiClose');
+const aiMessages = document.getElementById('aiMessages');
+const aiInput = document.getElementById('aiInput');
+const aiSendButton = document.getElementById('aiSendButton');
+const aiFileInput = document.getElementById('aiFileInput');
+const aiNote = document.getElementById('aiNote');
+const gamesToggle = document.getElementById('gamesToggle');
+const gamesPanel = document.getElementById('gamesPanel');
+const gamesClose = document.getElementById('gamesClose');
+const tetrisCanvas = document.getElementById('tetrisCanvas');
+const startGameButton = document.getElementById('startGame');
+const scoreElement = document.getElementById('score');
+const playerNameInput = document.getElementById('playerName');
+const leaderboardToggle = document.getElementById('leaderboardToggle');
+const leaderboardList = document.getElementById('leaderboardList');
+const leaderboardPanel = document.getElementById('leaderboardPanel');
+const leaderboardClose = document.getElementById('leaderboardClose');
+
+const TETRIS_LEADERBOARD_KEY = 'tetrisLeaderboard';
+let tetrisLeaderboard = [];
 
 const adminPassword = '1583ADMIN'; // Mot de passe pour accéder au panneau admin (à changer pour plus de sécurité)
 let isAdmin = false;
@@ -20,8 +42,11 @@ let contactEmail = localStorage.getItem('contactEmail') || '';
 let contactName = localStorage.getItem('contactName') || '';
 
 (function() {
-  emailjs.init('YOUR_PUBLIC_KEY'); // Remplacez par votre clé publique EmailJS
+  emailjs.init('yryXbsEOJe94IMzDt'); // Remplacez par votre clé publique EmailJS
 })();
+
+const OPENAI_API_KEY = ''; // Clé OpenAI non configurée par défaut, utilisation de l’IA locale.
+const OPENAI_MODEL = 'gpt-3.5-turbo';
 
 function updateButtonText() {
   const isDark = document.documentElement.classList.contains('dark');
@@ -132,7 +157,7 @@ function initGoogleSignIn() {
     return;
   }
   google.accounts.id.initialize({
-    client_id: 'YOUR_GOOGLE_CLIENT_ID',
+    client_id: '609638615194-h59lhro3avtov0biuneh75u9h4394k55.apps.googleusercontent.com',
     callback: handleCredentialResponse,
     auto_select: false,
     cancel_on_tap_outside: true,
@@ -384,6 +409,631 @@ function sharePost(post) {
   }
 }
 
+function openAiChat() {
+  aiChatPanel.classList.remove('hidden');
+  aiChatPanel.style.display = '';
+  aiInput.focus();
+}
+
+function closeAiChat() {
+  aiChatPanel.classList.add('hidden');
+  aiChatPanel.style.display = 'none';
+}
+
+function openGames() {
+  gamesPanel.classList.remove('hidden');
+  gamesPanel.style.display = '';
+}
+
+function closeGames() {
+  gamesPanel.classList.add('hidden');
+  gamesPanel.style.display = 'none';
+  stopTetris();
+}
+
+function loadTetrisLeaderboard() {
+  try {
+    const stored = localStorage.getItem(TETRIS_LEADERBOARD_KEY);
+    tetrisLeaderboard = stored ? JSON.parse(stored) : [];
+  } catch (error) {
+    console.warn('Impossible de charger le classement Tetris :', error);
+    tetrisLeaderboard = [];
+  }
+}
+
+function saveTetrisLeaderboard() {
+  localStorage.setItem(TETRIS_LEADERBOARD_KEY, JSON.stringify(tetrisLeaderboard));
+}
+
+function renderTetrisLeaderboard() {
+  if (!leaderboardList) return;
+  leaderboardList.innerHTML = '';
+  if (tetrisLeaderboard.length === 0) {
+    const item = document.createElement('li');
+    item.textContent = 'Aucun score enregistré pour le moment.';
+    leaderboardList.appendChild(item);
+    return;
+  }
+  tetrisLeaderboard.slice(0, 5).forEach((entry) => {
+    const item = document.createElement('li');
+    item.textContent = `${entry.name} — ${entry.score} pts`;
+    leaderboardList.appendChild(item);
+  });
+}
+
+function updateTetrisLeaderboard(name, score) {
+  const trimmedName = (name || 'Joueur').trim().slice(0, 20) || 'Joueur';
+  tetrisLeaderboard.push({ name: trimmedName, score });
+  tetrisLeaderboard.sort((a, b) => b.score - a.score);
+  tetrisLeaderboard = tetrisLeaderboard.slice(0, 5);
+  saveTetrisLeaderboard();
+  renderTetrisLeaderboard();
+}
+
+function panelDragStart(event) {
+  if (event.button !== 0) return;
+  const panel = event.currentTarget.closest('.ai-chat-panel, .games-panel');
+  if (!panel) return;
+
+  const rect = panel.getBoundingClientRect();
+  panelDragState.active = true;
+  panelDragState.panel = panel;
+  panelDragState.startX = event.clientX;
+  panelDragState.startY = event.clientY;
+  panelDragState.panelStartLeft = rect.left;
+  panelDragState.panelStartTop = rect.top;
+
+  panel.style.left = `${rect.left}px`;
+  panel.style.top = `${rect.top}px`;
+  panel.style.right = 'auto';
+  panel.style.bottom = 'auto';
+  document.body.style.userSelect = 'none';
+}
+
+function panelResizeStart(event) {
+  event.stopPropagation();
+  if (event.button !== 0) return;
+  const panel = event.currentTarget.closest('.ai-chat-panel, .games-panel');
+  if (!panel) return;
+
+  const rect = panel.getBoundingClientRect();
+  panelResizeState.active = true;
+  panelResizeState.panel = panel;
+  panelResizeState.startX = event.clientX;
+  panelResizeState.startY = event.clientY;
+  panelResizeState.panelStartWidth = rect.width;
+  panelResizeState.panelStartHeight = rect.height;
+
+  document.body.style.userSelect = 'none';
+}
+
+function panelPointerMove(event) {
+  if (panelDragState.active && panelDragState.panel) {
+    const dx = event.clientX - panelDragState.startX;
+    const dy = event.clientY - panelDragState.startY;
+    panelDragState.panel.style.left = `${Math.max(10, panelDragState.panelStartLeft + dx)}px`;
+    panelDragState.panel.style.top = `${Math.max(10, panelDragState.panelStartTop + dy)}px`;
+  }
+
+  if (panelResizeState.active && panelResizeState.panel) {
+    const dx = event.clientX - panelResizeState.startX;
+    const dy = event.clientY - panelResizeState.startY;
+    panelResizeState.panel.style.width = `${Math.max(280, panelResizeState.panelStartWidth + dx)}px`;
+    panelResizeState.panel.style.height = `${Math.max(260, panelResizeState.panelStartHeight + dy)}px`;
+  }
+}
+
+function panelPointerUp() {
+  panelDragState.active = false;
+  panelResizeState.active = false;
+  panelDragState.panel = null;
+  panelResizeState.panel = null;
+  document.body.style.userSelect = '';
+}
+
+function initPanelInteractions() {
+  const panels = [aiChatPanel, gamesPanel, leaderboardPanel];
+  panels.forEach(panel => {
+    if (!panel) return;
+    const header = panel.querySelector('.ai-chat-header, .games-header');
+    const resizer = panel.querySelector('.panel-resizer');
+    if (header) {
+      header.classList.add('panel-draggable');
+      header.addEventListener('mousedown', panelDragStart);
+    }
+    if (resizer) {
+      resizer.addEventListener('mousedown', panelResizeStart);
+    }
+  });
+
+  document.addEventListener('mousemove', panelPointerMove);
+  document.addEventListener('mouseup', panelPointerUp);
+  document.addEventListener('mouseleave', panelPointerUp);
+}
+
+const panelDragState = {
+  active: false,
+  panel: null,
+  startX: 0,
+  startY: 0,
+  panelStartLeft: 0,
+  panelStartTop: 0
+};
+
+const panelResizeState = {
+  active: false,
+  panel: null,
+  startX: 0,
+  startY: 0,
+  panelStartWidth: 0,
+  panelStartHeight: 0
+};
+
+function appendAiMessage(role, text, imageUrl) {
+  const message = document.createElement('div');
+  message.className = `ai-message ai-${role}`;
+  if (text) {
+    message.innerHTML = `<p>${text}</p>`;
+  }
+  if (imageUrl) {
+    const image = document.createElement('img');
+    image.src = imageUrl;
+    image.alt = 'Image envoyée';
+    message.appendChild(image);
+  }
+  aiMessages.appendChild(message);
+  aiMessages.scrollTop = aiMessages.scrollHeight;
+}
+
+function setAiStatus(message) {
+  if (aiNote) {
+    aiNote.textContent = message;
+  }
+}
+
+function isRequestAllowed(text) {
+  const forbidden = ['sexe', 'porn', 'viol', 'drugs', 'kill', 'bomb', 'terror', 'hack', 'pirate', 'racist', 'insult', 'crime'];
+  const normalized = text.toLowerCase();
+  return !forbidden.some(word => normalized.includes(word));
+}
+
+function randomChoice(items) {
+  return items[Math.floor(Math.random() * items.length)];
+}
+
+async function fetchOpenAiResponse(prompt, hasImage) {
+  if (!OPENAI_API_KEY.trim()) {
+    console.warn('Clé OpenAI absente : utilisation de l’IA locale.');
+    return generateAiResponse(prompt, hasImage);
+  }
+
+  const systemMessage = {
+    role: 'system',
+    content: 'Tu es un assistant utile et respectueux. Tu réponds aux demandes simples et appropriées sans entrer dans des sujets inappropriés.'
+  };
+  let userContent = prompt || '';
+  if (hasImage) {
+    userContent += (userContent ? '\n' : '') + 'Une image a été envoyée avec cette demande. Réponds de manière claire et simple en tenant compte de cette information.';
+  }
+  if (!userContent) {
+    userContent = 'L’utilisateur a envoyé une image sans texte. Réponds de manière simple et utile.';
+  }
+  if (hasImage) {
+    userContent += ' Note : l’image est reçue, mais je ne peux analyser que le contexte textuel dans cette interface.';
+  }
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        messages: [systemMessage, { role: 'user', content: userContent }],
+        max_tokens: 250,
+        temperature: 0.7
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error:', response.status, errorText);
+      return generateAiResponse(prompt, hasImage);
+    }
+
+    const data = await response.json();
+    return data?.choices?.[0]?.message?.content?.trim() || 'Désolé, je n’ai pas obtenu de réponse. Essaie une autre question simple.';
+  } catch (error) {
+    console.error('OpenAI fetch error:', error);
+    return 'Désolé, il y a eu un problème avec l’IA. Réessaye dans quelques instants.';
+  }
+}
+
+function generateAiResponse(text, hasImage) {
+  const normalized = (text || '').trim().toLowerCase();
+  const greetings = ['bonjour', 'salut', 'coucou', 'hey', 'hello'];
+  const farewells = ['au revoir', 'à bientôt', 'bye', 'salut'];
+  const thanks = ['merci', 'thanks', 'super', 'top', 'cool'];
+
+  if (hasImage && !normalized) {
+    return randomChoice([
+      'J’ai bien reçu ton image. Dis-moi ce que tu veux savoir ou ce que tu cherches.',
+      'Image reçue ! Tu peux maintenant me poser une question simple sur ce que tu as envoyé.',
+      'Merci pour l’image. Si tu veux, décris ce que tu veux que je regarde ou que je t’explique.'
+    ]);
+  }
+
+  if (!normalized) {
+    return randomChoice([
+      'Écris-moi une question simple ou envoie une image pour commencer.',
+      'Je suis prêt, pose-moi une question claire et je te réponds simplement.',
+      'Je peux t’aider sur un sujet simple — essaie une question courte.'
+    ]);
+  }
+
+  if (greetings.some(word => normalized.includes(word))) {
+    return randomChoice([
+      'Salut ! Que veux-tu savoir aujourd’hui ?',
+      'Bonjour ! Pose-moi une question simple ou envoie une image.',
+      'Salut ! Je suis là pour t’aider sur des sujets simples.'
+    ]);
+  }
+
+  if (farewells.some(word => normalized.includes(word))) {
+    return randomChoice([
+      'À bientôt ! N’hésite pas à revenir si tu as d’autres questions.',
+      'Au revoir ! Je suis là si tu veux poser une autre question.',
+      'À plus tard ! Reviens quand tu veux pour une autre question simple.'
+    ]);
+  }
+
+  if (thanks.some(word => normalized.includes(word))) {
+    return randomChoice([
+      'Avec plaisir ! Si tu veux, tu peux me poser autre chose.',
+      'Merci ! Dis-moi si tu veux un autre renseignement.',
+      'Content d’avoir pu aider. Pose-moi une autre question si tu veux.'
+    ]);
+  }
+
+  if (normalized.includes('qui es') || normalized.includes('tu es')) {
+    return randomChoice([
+      'Je suis une IA locale simple intégrée à ce site. Je réponds aux questions claires et respectueuses.',
+      'Je suis le chat IA du site. Je peux répondre à des questions simples et donner des conseils basiques.',
+      'Je suis un assistant du site, conçu pour aider sur des sujets simples sans clé API.'
+    ]);
+  }
+
+  if (normalized.includes('aide') || normalized.includes('comment') || normalized.includes('peux-tu') || normalized.includes('peux tu')) {
+    return randomChoice([
+      'Je suis là pour t’aider. Pose-moi une question simple sur un sujet clair.',
+      'Demande-moi quelque chose de simple, comme une explication courte ou un conseil basique.',
+      'Je peux te donner une réponse simple si tu formules une question claire.'
+    ]);
+  }
+
+  if (normalized.includes('image') || normalized.includes('photo')) {
+    return randomChoice([
+      'Je reçois ton image, mais je traite surtout le texte. Dis-moi ce que tu veux savoir à propos de l’image.',
+      'Ton image est bien reçue. Pose-moi une question claire sur son contenu ou son usage.',
+      'Je peux t’aider à décrire une image si tu me dis ce que tu veux en savoir.'
+    ]);
+  }
+
+  if (normalized.includes('site') || normalized.includes('web') || normalized.includes('page')) {
+    return randomChoice([
+      'Ce site présente un chat IA local et un espace de posts. Je peux répondre à des questions simples dessus.',
+      'Je suis intégré à cette page web pour aider à répondre à des questions simples sans API externe.',
+      'Le site contient un chat IA et des posts, et je suis là pour te répondre avec des réponses simples.'
+    ]);
+  }
+
+  if (normalized.includes('heure') || normalized.includes('météo') || normalized.includes('temps')) {
+    return randomChoice([
+      'Je ne peux pas lire la météo en direct, mais je peux te donner une réponse simple sur les sujets que tu demandes.',
+      'Je n’ai pas accès au temps réel ici, mais je peux t’aider avec une réponse générale ou des conseils.',
+      'Je ne vois pas la météo actuelle. Pose-moi une autre question simple si tu veux.'
+    ]);
+  }
+
+  if (normalized.includes('blague') || normalized.includes('humour') || normalized.includes('drôle')) {
+    return randomChoice([
+      'Pourquoi les programmeurs confondent Halloween et Noël ? Parce que OCT 31 = DEC 25.',
+      'Voici une blague simple : pourquoi l’ordinateur était fatigué ? Parce qu’il avait trop de bits à traiter.',
+      'Je peux te faire rire un peu : un bug entre dans un bar et le barman dit "Pas de blague".'
+    ]);
+  }
+
+  if (normalized.includes('pourquoi') || normalized.includes('pq')) {
+    return randomChoice([
+      'C\'est une bonne question. La réponse dépend souvent du contexte. Peux-tu donner plus de détails ?',
+      'Pourquoi ? C\'est une question profonde. En général, les choses arrivent pour des raisons variées.',
+      'Je ne peux pas lire dans les pensées, mais je peux essayer de t\'expliquer si tu précises.'
+    ]);
+  }
+
+  // Réponses basiques à des sujets courants
+  if (normalized.includes('ciel') || normalized.includes('bleu')) {
+    return 'Le ciel apparaît bleu parce que la lumière du soleil se diffuse dans l\'atmosphère terrestre.';
+  }
+
+  if (normalized.includes('ordinateur') || normalized.includes('pc') || normalized.includes('informatique')) {
+    return 'Les ordinateurs sont des machines qui traitent des informations. Ils utilisent un processeur, de la mémoire RAM, un disque dur, etc.';
+  }
+
+  if (normalized.includes('internet') || normalized.includes('web')) {
+    return 'Internet est un réseau mondial qui connecte des milliards d\'ordinateurs. Il permet de partager des informations et communiquer.';
+  }
+
+  if (normalized.includes('couleur') || normalized.includes('couleurs')) {
+    return 'Les couleurs sont créées par la lumière. Les couleurs primaires sont le rouge, le bleu et le vert.';
+  }
+
+  if (normalized.includes('animaux') || normalized.includes('animal')) {
+    return 'Les animaux sont des êtres vivants qui ne sont pas des plantes. Il existe des mammifères, oiseaux, reptiles, etc.';
+  }
+
+  if (normalized.includes('nourriture') || normalized.includes('manger')) {
+    return 'La nourriture est essentielle pour la santé. Mangez équilibré : fruits, légumes, protéines, glucides et matières grasses.';
+  }
+
+  if (normalized.includes('sport') || normalized.includes('sports')) {
+    return 'Le sport est bon pour la santé. Il y a le football, le basket, la natation, etc. Choisis celui que tu aimes !';
+  }
+
+  if (normalized.includes('musique') || normalized.includes('chanson')) {
+    return 'La musique est un art qui utilise le son. Il y a du rock, du pop, du classique, etc. Quelle est ta préférée ?';
+  }
+
+  // Fallback plus varié et utile
+  return randomChoice([
+    'Je ne suis pas sûr de comprendre ta question. Peux-tu la reformuler de manière plus simple ?',
+    'Essaie de poser une question plus claire ou sur un sujet que je connais.',
+    'Je réponds mieux aux questions simples. Dis-moi ce que tu veux savoir exactement.',
+    'Pose-moi une question sur le site, une blague ou un sujet basique.',
+    'Je peux t’aider avec des conseils simples ou des explications courtes. Essaie autre chose.'
+  ]);
+}
+
+// Tetris Game
+const ROWS = 20;
+const COLS = 10;
+const BLOCK_SIZE = 30;
+const COLORS = ['#000', '#f00', '#0f0', '#00f', '#ff0', '#f0f', '#0ff', '#fff'];
+
+let board = [];
+let currentPiece = null;
+let currentPieceId = 1;
+let currentX = 0;
+let currentY = 0;
+let score = 0;
+let gameInterval = null;
+let ctx = null;
+
+const PIECES = [
+  [[1, 1, 1, 1]], // I
+  [[1, 1], [1, 1]], // O
+  [[0, 1, 0], [1, 1, 1]], // T
+  [[1, 0, 0], [1, 1, 1]], // J
+  [[0, 0, 1], [1, 1, 1]], // L
+  [[1, 1, 0], [0, 1, 1]], // S
+  [[0, 1, 1], [1, 1, 0]]  // Z
+];
+
+function initBoard() {
+  board = [];
+  for (let r = 0; r < ROWS; r++) {
+    board[r] = [];
+    for (let c = 0; c < COLS; c++) {
+      board[r][c] = 0;
+    }
+  }
+}
+
+function drawBoard() {
+  ctx.clearRect(0, 0, tetrisCanvas.width, tetrisCanvas.height);
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      if (board[r][c]) {
+        ctx.fillStyle = COLORS[board[r][c]];
+        ctx.fillRect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        ctx.strokeStyle = '#000';
+        ctx.strokeRect(c * BLOCK_SIZE, r * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+      }
+    }
+  }
+  // Draw current piece
+  if (currentPiece) {
+    for (let r = 0; r < currentPiece.length; r++) {
+      for (let c = 0; c < currentPiece[r].length; c++) {
+        if (currentPiece[r][c]) {
+          ctx.fillStyle = COLORS[currentPieceId];
+          ctx.fillRect((currentX + c) * BLOCK_SIZE, (currentY + r) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+          ctx.strokeStyle = '#000';
+          ctx.strokeRect((currentX + c) * BLOCK_SIZE, (currentY + r) * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE);
+        }
+      }
+    }
+  }
+}
+
+function newPiece() {
+  const type = Math.floor(Math.random() * PIECES.length);
+  currentPieceId = type + 1;
+  currentPiece = PIECES[type].map(row => [...row]);
+  currentX = Math.floor(COLS / 2) - 1;
+  currentY = 0;
+  if (collision()) {
+    gameOver();
+  }
+}
+
+function collision() {
+  for (let r = 0; r < currentPiece.length; r++) {
+    for (let c = 0; c < currentPiece[r].length; c++) {
+      if (currentPiece[r][c]) {
+        const newX = currentX + c;
+        const newY = currentY + r;
+        if (newX < 0 || newX >= COLS || newY >= ROWS || (newY >= 0 && board[newY][newX])) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function placePiece() {
+  for (let r = 0; r < currentPiece.length; r++) {
+    for (let c = 0; c < currentPiece[r].length; c++) {
+      if (currentPiece[r][c]) {
+        board[currentY + r][currentX + c] = currentPieceId;
+      }
+    }
+  }
+  clearLines();
+  newPiece();
+}
+
+function clearLines() {
+  for (let r = ROWS - 1; r >= 0; r--) {
+    if (board[r].every(cell => cell !== 0)) {
+      board.splice(r, 1);
+      board.unshift(new Array(COLS).fill(0));
+      score += 100;
+      scoreElement.textContent = `Score: ${score}`;
+      r++; // Check the same row again
+    }
+  }
+}
+
+function rotatePiece() {
+  const rotated = currentPiece[0].map((_, index) => currentPiece.map(row => row[index]).reverse());
+  const oldPiece = currentPiece;
+  currentPiece = rotated;
+  if (collision()) {
+    currentPiece = oldPiece;
+  }
+}
+
+function movePiece(dx, dy) {
+  currentX += dx;
+  currentY += dy;
+  if (collision()) {
+    currentX -= dx;
+    currentY -= dy;
+    if (dy > 0) {
+      placePiece();
+    }
+  }
+}
+
+function dropPiece() {
+  while (!collision()) {
+    currentY++;
+  }
+  currentY--;
+  placePiece();
+}
+
+function gameLoop() {
+  movePiece(0, 1);
+  drawBoard();
+}
+
+function startTetris() {
+  if (gameInterval) return;
+  initBoard();
+  score = 0;
+  scoreElement.textContent = 'Score: 0';
+  ctx = tetrisCanvas.getContext('2d');
+  newPiece();
+  gameInterval = setInterval(gameLoop, 500);
+  startGameButton.textContent = 'Arrêter';
+}
+
+function stopTetris() {
+  if (gameInterval) {
+    clearInterval(gameInterval);
+    gameInterval = null;
+    startGameButton.textContent = 'Démarrer';
+  }
+}
+
+function gameOver() {
+  stopTetris();
+  updateTetrisLeaderboard(playerNameInput?.value || 'Joueur', score);
+  alert('Game Over! Score: ' + score);
+}
+
+// Controls
+document.addEventListener('keydown', (e) => {
+  if (!gameInterval) return;
+  switch (e.key) {
+    case 'ArrowLeft':
+      movePiece(-1, 0);
+      break;
+    case 'ArrowRight':
+      movePiece(1, 0);
+      break;
+    case 'ArrowDown':
+      movePiece(0, 1);
+      break;
+    case 'ArrowUp':
+      rotatePiece();
+      break;
+    case ' ':
+      e.preventDefault();
+      dropPiece();
+      break;
+  }
+  drawBoard();
+});
+
+async function handleAiSend() {
+  const userText = aiInput.value.trim();
+  const file = aiFileInput.files[0];
+  if (!userText && !file) {
+    setAiStatus('Écris une demande ou ajoute une image.');
+    return;
+  }
+  if (userText && !isRequestAllowed(userText)) {
+    appendAiMessage('user', userText);
+    appendAiMessage('bot', 'Cette demande n’est pas autorisée. Pose une question simple, respectueuse et claire.');
+    aiInput.value = '';
+    aiFileInput.value = '';
+    aiFileInput.previousElementSibling.textContent = '+ Image';
+    setAiStatus('Demande non autorisée.');
+    return;
+  }
+
+  const userLabel = userText || (file ? 'J’ai envoyé une image.' : '');
+  if (userLabel) {
+    appendAiMessage('user', userLabel);
+  }
+  if (file) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      appendAiMessage('user', '', reader.result);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  aiSendButton.disabled = true;
+  setAiStatus('Envoi à l’IA...');
+
+  const response = await fetchOpenAiResponse(userText, Boolean(file));
+  appendAiMessage('bot', response);
+
+  aiSendButton.disabled = false;
+  setAiStatus('L’IA répond à des demandes simples et respectueuses. Pas de questions étranges.');
+
+  aiInput.value = '';
+  aiFileInput.value = '';
+  aiFileInput.previousElementSibling.textContent = '+ Image';
+}
+
 function loginAdmin() {
   const passwordInput = document.getElementById('adminPassword').value;
   if (passwordInput === adminPassword) {
@@ -430,14 +1080,64 @@ sendButton.addEventListener('click', () => {
 adminToggle.addEventListener('click', showAdminPanel);
 adminLoginButton.addEventListener('click', loginAdmin);
 addPostButton.addEventListener('click', addPost);
+aiToggle.addEventListener('click', openAiChat);
+if (aiClose) {
+  aiClose.addEventListener('click', (event) => {
+    event.preventDefault();
+    closeAiChat();
+  });
+} else {
+  console.warn('aiClose button not found');
+}
+aiSendButton.addEventListener('click', handleAiSend);
+aiInput.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    handleAiSend();
+  }
+});
+aiFileInput.addEventListener('change', () => {
+  if (aiFileInput.files.length > 0) {
+    aiFileInput.previousElementSibling.textContent = 'Image sélectionnée';
+  }
+});
+gamesToggle.addEventListener('click', openGames);
+gamesClose.addEventListener('click', (event) => {
+  event.preventDefault();
+  closeGames();
+});
+startGameButton.addEventListener('click', () => {
+  if (gameInterval) {
+    stopTetris();
+  } else {
+    startTetris();
+  }
+});
+
+if (leaderboardToggle) {
+  leaderboardToggle.addEventListener('click', () => {
+    if (!leaderboardPanel) return;
+    leaderboardPanel.classList.toggle('hidden');
+  });
+}
+
+if (leaderboardClose) {
+  leaderboardClose.addEventListener('click', () => {
+    if (!leaderboardPanel) return;
+    leaderboardPanel.classList.add('hidden');
+  });
+}
 
 // Initialisation
 loadPosts();
 renderPosts();
 updateButtonText();
 checkContactLogin();
+loadTetrisLeaderboard();
+renderTetrisLeaderboard();
 
 window.addEventListener('load', () => {
   initGoogleSignIn();
   initFirebase();
+  initPanelInteractions();
 });

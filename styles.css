@@ -64,6 +64,54 @@ body {
   font-weight: 600;
 }
 
+.ai-toggle-button {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #22c55e, #3b82f6);
+  color: white;
+  border: 2px solid transparent;
+  padding: 0.85rem 1.4rem;
+  transition: transform 0.2s ease;
+}
+
+.ai-toggle-button::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  z-index: -1;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #22c55e, #06b6d4, #3b82f6, #22c55e);
+  animation: ai-border 3s linear infinite;
+}
+
+.ai-toggle-button:hover {
+  transform: translateY(-2px);
+}
+
+.games-toggle-button {
+  background: linear-gradient(135deg, #ff6b6b, #ffa500);
+  color: white;
+  border: 2px solid transparent;
+  padding: 0.85rem 1.4rem;
+  transition: transform 0.2s ease;
+}
+
+.games-toggle-button:hover {
+  transform: translateY(-2px);
+}
+
+@keyframes ai-border {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .hero {
   display: grid;
   grid-template-columns: 1.5fr 1fr;
@@ -258,6 +306,274 @@ body {
   grid-template-columns: 1fr 1fr;
   gap: 2rem;
   padding-bottom: 4rem;
+}
+
+.ai-chat-panel {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  width: min(420px, calc(100% - 2rem));
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  box-shadow: 0 25px 80px rgba(15, 23, 42, 0.18);
+  z-index: 1000;
+}
+
+.ai-chat-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-chat-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.ai-chat-header p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.ai-messages {
+  padding: 1rem;
+  display: grid;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+.ai-message {
+  max-width: 100%;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  line-height: 1.4;
+  font-size: 0.95rem;
+}
+
+.ai-message.ai-user {
+  align-self: flex-end;
+  background: rgba(59, 130, 246, 0.12);
+  color: var(--text);
+  border-bottom-right-radius: 6px;
+}
+
+.ai-message.ai-bot {
+  align-self: flex-start;
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--text);
+  border-bottom-left-radius: 6px;
+}
+
+.ai-message img {
+  max-width: 100%;
+  border-radius: 18px;
+  margin-top: 0.65rem;
+}
+
+.ai-chat-footer {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem 1.25rem;
+}
+
+.ai-file-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--primary);
+  cursor: pointer;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  font-weight: 600;
+}
+
+#aiFileInput {
+  display: none;
+}
+
+#aiInput {
+  min-height: 4.2rem;
+}
+
+.ai-note {
+  margin: 0;
+  padding: 0 1.25rem 1rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.games-panel {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 1.5rem;
+  width: min(320px, calc(100% - 2rem));
+  max-height: 75vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  box-shadow: 0 25px 80px rgba(15, 23, 42, 0.18);
+  z-index: 1000;
+  min-width: 260px;
+  min-height: 240px;
+}
+
+.panel-draggable {
+  cursor: move;
+  user-select: none;
+}
+
+.panel-resizer {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  right: 10px;
+  bottom: 10px;
+  background: rgba(15, 23, 42, 0.15);
+  border-radius: 6px;
+  cursor: se-resize;
+}
+
+.games-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.games-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.games-header p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+#tetrisCanvas {
+  display: block;
+  margin: 1rem auto;
+  border: 1px solid var(--border);
+  background: #000;
+  width: 260px;
+  height: 520px;
+  max-width: 100%;
+}
+
+.games-info {
+  padding: 0 1.25rem;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.games-info label {
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
+.games-info input {
+  width: 100%;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.leaderboard {
+  padding: 0 1.25rem 1rem;
+}
+
+.leaderboard h3 {
+  margin: 0.75rem 0 0.5rem;
+  font-size: 1rem;
+}
+
+#leaderboardList {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--text);
+}
+
+#leaderboardList li {
+  margin-bottom: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.games-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.leaderboard-panel {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  width: min(300px, calc(100% - 2rem));
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  box-shadow: 0 25px 80px rgba(15, 23, 42, 0.18);
+  z-index: 1100;
+  min-width: 260px;
+  min-height: 220px;
+}
+
+.leaderboard-panel .panel-resizer {
+  right: 10px;
+  bottom: 10px;
+}
+
+.leaderboard-content {
+  padding: 1rem 1.25rem 1.25rem;
+  overflow-y: auto;
+}
+
+.leaderboard-panel ol {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--text);
+}
+
+.leaderboard-panel li {
+  margin-bottom: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.hidden {
+  display: none;
+}
+
+.games-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1.25rem 1.25rem;
+}
+
+#score {
+  font-weight: 600;
+  color: var(--primary);
 }
 
 .contact form {
