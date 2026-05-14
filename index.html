@@ -60,6 +60,9 @@
           <div id="pollFields" class="poll-fields hidden">
             <label for="pollQuestion">Question du sondage</label>
             <input id="pollQuestion" type="text" placeholder="Par exemple : Quel est ton jeu préféré ?" />
+            <label class="checkbox-label" for="pollMultipleChoices">
+              <input id="pollMultipleChoices" type="checkbox" /> Autoriser plusieurs choix
+            </label>
             <div id="pollOptionsContainer" class="poll-options-container">
               <label>Options de sondage</label>
               <input class="poll-option-input" type="text" placeholder="Option 1" />
@@ -117,7 +120,7 @@
       <label for="playerName">Nom du joueur</label>
       <input id="playerName" type="text" placeholder="Ton nom" />
     </div>
-    <canvas id="tetrisCanvas" width="250" height="550"></canvas>
+    <canvas id="tetrisCanvas" width="280" height="550"></canvas>
     <div class="mobile-controls">
       <button id="moveLeft" type="button" class="button button-secondary">←</button>
       <button id="tetrisRotate" type="button" class="button button-secondary">⟳</button>
