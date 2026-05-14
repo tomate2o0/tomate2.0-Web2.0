@@ -34,6 +34,7 @@ const pollFields = document.getElementById('pollFields');
 const pollQuestionInput = document.getElementById('pollQuestion');
 const pollOptionsContainer = document.getElementById('pollOptionsContainer');
 const addPollOptionButton = document.getElementById('addPollOptionButton');
+const pollMultipleChoicesCheckbox = document.getElementById('pollMultipleChoices');
 
 let tetrisPointerState = {
   active: false,
@@ -53,7 +54,7 @@ const adminPassword = '1583ADMIN'; // Mot de passe pour accéder au panneau admi
 let isAdmin = false;
 let posts = [];
 let likedPosts = [];
-let votedPolls = [];
+let userVotes = {};
 let editingPostId = null;
 let contactEmail = '';
 let contactName = '';
@@ -77,6 +78,7 @@ function loadPosts() {
       text: option.text || '',
       votes: typeof option.votes === 'number' ? option.votes : 0,
     }));
+    if (typeof post.multipleChoices !== 'boolean') post.multipleChoices = false;
   });
   likedPosts = JSON.parse(localStorage.getItem('likedPosts')) || [];
 }
@@ -128,6 +130,7 @@ function subscribePosts() {
           text: option.text || '',
           votes: typeof option.votes === 'number' ? option.votes : 0,
         })) : [],
+        multipleChoices: typeof data.multipleChoices === 'boolean' ? data.multipleChoices : false,
         createdAt: data.createdAt || ''
       });
     });
@@ -143,11 +146,11 @@ function saveLikedPosts() {
 }
 
 function loadVotedPolls() {
-  votedPolls = JSON.parse(localStorage.getItem('votedPolls')) || [];
+  userVotes = JSON.parse(localStorage.getItem('userVotes')) || {};
 }
 
 function saveVotedPolls() {
-  localStorage.setItem('votedPolls', JSON.stringify(votedPolls));
+  localStorage.setItem('userVotes', JSON.stringify(userVotes));
 }
 
 function createVideoElement(url) {
@@ -350,19 +353,93 @@ function renderPosts() {
   });
 }
 
-function hasVotedInPoll(postId) {
-  return votedPolls.includes(postId);
+function getUserVotesForPost(postId) {
+  return userVotes[postId] || [];
 }
 
 function votePoll(postId, optionIndex) {
   const post = posts.find(p => p.id === postId);
   if (!post || !Array.isArray(post.pollOptions) || !post.pollOptions[optionIndex]) return;
-  if (hasVotedInPoll(postId)) {
-    alert('Tu as déjà voté dans ce sondage.');
+
+  const userVotedOptions = getUserVotesForPost(postId);
+  const isMultiple = post.multipleChoices;
+
+  if (isMultiple) {
+    // Multiple choices: toggle the option
+    const indexInUserVotes = userVotedOptions.indexOf(optionIndex);
+    if (indexInUserVotes > -1) {
+      // Remove vote
+      userVotedOptions.splice(indexInUserVotes, 1);
+      post.pollOptions[optionIndex].votes = Math.max(0, (post.pollOptions[optionIndex].votes || 0) - 1);
+    } else {
+      // Add vote
+      userVotedOptions.push(optionIndex);
+      post.pollOptions[optionIndex].votes = (post.pollOptions[optionIndex].votes || 0) + 1;
+    }
+  } else {
+    // Single choice: change to this option
+    // Remove previous vote if any
+    if (userVotedOptions.length > 0) {
+      const prevOption = userVotedOptions[0];
+      post.pollOptions[prevOption].votes = Math.max(0, (post.pollOptions[prevOption].votes || 0) - 1);
+    }
+    // Add new vote
+    userVotedOptions.length = 0; // Clear
+    userVotedOptions.push(optionIndex);
+    post.pollOptions[optionIndex].votes = (post.pollOptions[optionIndex].votes || 0) + 1;
+  }
+
+  // Update userVotes
+  if (userVotedOptions.length > 0) {
+    userVotes[postId] = userVotedOptions;
+  } else {
+    delete userVotes[postId];
+  }
+
+  if (firestoreReady) {
+    postsCollection.doc(postId).update({ pollOptions: post.pollOptions }).catch(error => {
+      console.error('Erreur mise à jour sondage Firestore :', error);
+    });
+  }
+  savePosts();
+  saveVotedPolls();
+  renderPosts();
+}
+
+function addOptionToPoll(postId) {
+  const newOptionText = prompt('Entrez le texte de la nouvelle option:');
+  if (!newOptionText || !newOptionText.trim()) return;
+
+  const post = posts.find(p => p.id === postId);
+  if (!post || !Array.isArray(post.pollOptions)) return;
+
+  post.pollOptions.push({ text: newOptionText.trim(), votes: 0 });
+
+  if (firestoreReady) {
+    postsCollection.doc(postId).update({ pollOptions: post.pollOptions }).catch(error => {
+      console.error('Erreur mise à jour sondage Firestore :', error);
+    });
+  }
+  savePosts();
+  renderPosts();
+}
+
+function removeOptionFromPoll(postId, optionIndex) {
+  const post = posts.find(p => p.id === postId);
+  if (!post || !Array.isArray(post.pollOptions)) return;
+  
+  if (post.pollOptions.length <= 2) {
+    alert('Un sondage doit avoir au moins 2 options.');
     return;
   }
-  post.pollOptions[optionIndex].votes = (post.pollOptions[optionIndex].votes || 0) + 1;
-  votedPolls.push(postId);
+  
+  post.pollOptions.splice(optionIndex, 1);
+  
+  // Recalculate user votes to remove deleted option
+  if (userVotes[postId]) {
+    userVotes[postId] = userVotes[postId].filter(idx => idx !== optionIndex);
+  }
+
   if (firestoreReady) {
     postsCollection.doc(postId).update({ pollOptions: post.pollOptions }).catch(error => {
       console.error('Erreur mise à jour sondage Firestore :', error);
@@ -387,19 +464,41 @@ function renderPoll(post, content) {
   pollSection.appendChild(question);
 
   const totalVotes = post.pollOptions.reduce((sum, option) => sum + (typeof option.votes === 'number' ? option.votes : 0), 0);
-  const voted = hasVotedInPoll(post.id);
+  const userVotedOptions = getUserVotesForPost(post.id);
+  const isMultiple = post.multipleChoices;
 
   post.pollOptions.forEach((option, index) => {
     const optionWrapper = document.createElement('div');
     optionWrapper.className = 'poll-option';
 
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.gap = '0.5rem';
+    buttonContainer.style.alignItems = 'center';
+
     const voteButton = document.createElement('button');
     voteButton.type = 'button';
     voteButton.className = 'poll-vote-btn button';
     voteButton.textContent = option.text || `Option ${index + 1}`;
-    voteButton.disabled = voted;
+    voteButton.style.flex = '1';
+    if (userVotedOptions.includes(index)) {
+      voteButton.classList.add('voted');
+    }
     voteButton.addEventListener('click', () => votePoll(post.id, index));
-    optionWrapper.appendChild(voteButton);
+    buttonContainer.appendChild(voteButton);
+
+    if (isAdmin) {
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'button button-small button-delete';
+      deleteBtn.textContent = '✕';
+      deleteBtn.style.padding = '0.5rem 0.75rem';
+      deleteBtn.style.minWidth = 'auto';
+      deleteBtn.addEventListener('click', () => removeOptionFromPoll(post.id, index));
+      buttonContainer.appendChild(deleteBtn);
+    }
+
+    optionWrapper.appendChild(buttonContainer);
 
     const percent = totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0;
     const result = document.createElement('div');
@@ -412,29 +511,65 @@ function renderPoll(post, content) {
     pollSection.appendChild(optionWrapper);
   });
 
-  if (!voted) {
-    const hint = document.createElement('p');
-    hint.className = 'poll-hint';
-    hint.textContent = 'Choisis ton option préférée et vote pour le sondage.';
-    pollSection.appendChild(hint);
+  const hint = document.createElement('p');
+  hint.className = 'poll-hint';
+  if (isMultiple) {
+    hint.textContent = 'Choisis une ou plusieurs options et vote.';
+  } else {
+    hint.textContent = 'Choisis ton option préférée et vote.';
+  }
+  pollSection.appendChild(hint);
+
+  // Admin button to add options
+  if (isAdmin) {
+    const addOptionBtn = document.createElement('button');
+    addOptionBtn.className = 'button button-secondary';
+    addOptionBtn.textContent = 'Ajouter une option';
+    addOptionBtn.addEventListener('click', () => addOptionToPoll(post.id));
+    pollSection.appendChild(addOptionBtn);
   }
 
   content.appendChild(pollSection);
 }
 
 function addPollOptionInput(value = '') {
-  const currentCount = pollOptionsContainer.querySelectorAll('.poll-option-input').length;
+  const currentCount = pollOptionsContainer.querySelectorAll('.poll-option-input-wrapper').length;
   if (currentCount >= 5) {
     return;
   }
+  
+  const wrapper = document.createElement('div');
+  wrapper.className = 'poll-option-input-wrapper';
+  wrapper.style.display = 'flex';
+  wrapper.style.gap = '0.5rem';
+  wrapper.style.alignItems = 'center';
+  
   const input = document.createElement('input');
   input.type = 'text';
   input.className = 'poll-option-input';
   input.value = value;
   input.placeholder = `Option ${currentCount + 1}`;
-  pollOptionsContainer.appendChild(input);
+  input.style.flex = '1';
+  
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'button button-small button-delete';
+  removeBtn.textContent = '✕';
+  removeBtn.style.padding = '0.5rem 0.75rem';
+  removeBtn.style.minWidth = 'auto';
+  removeBtn.addEventListener('click', () => removePollOptionInput(wrapper));
+  
+  wrapper.appendChild(input);
+  wrapper.appendChild(removeBtn);
+  pollOptionsContainer.appendChild(wrapper);
   updatePollOptionPlaceholders();
-  addPollOptionButton.disabled = pollOptionsContainer.querySelectorAll('.poll-option-input').length >= 5;
+  addPollOptionButton.disabled = pollOptionsContainer.querySelectorAll('.poll-option-input-wrapper').length >= 5;
+}
+
+function removePollOptionInput(wrapper) {
+  wrapper.remove();
+  updatePollOptionPlaceholders();
+  addPollOptionButton.disabled = pollOptionsContainer.querySelectorAll('.poll-option-input-wrapper').length >= 5;
 }
 
 function updatePollOptionPlaceholders() {
@@ -473,6 +608,7 @@ function addPost() {
   const mediaUrl = document.getElementById('postMediaUrl').value.trim();
   const hasPoll = postHasPollCheckbox.checked;
   const pollQuestion = hasPoll ? pollQuestionInput.value.trim() : '';
+  const multipleChoices = hasPoll ? pollMultipleChoicesCheckbox.checked : false;
   const pollOptions = hasPoll
     ? Array.from(document.querySelectorAll('.poll-option-input'))
         .map(input => input.value.trim())
@@ -498,6 +634,7 @@ function addPost() {
     mediaUrl,
     pollQuestion,
     pollOptions,
+    multipleChoices,
   };
 
   if (editingPostId) {
@@ -545,6 +682,7 @@ function addPost() {
   postHasPollCheckbox.checked = false;
   togglePollFields();
   pollQuestionInput.value = '';
+  pollMultipleChoicesCheckbox.checked = false;
   pollOptionsContainer.innerHTML = '';
   addPollOptionInput();
   addPollOptionInput();
@@ -562,15 +700,16 @@ function startEditPost(postId) {
   document.getElementById('postMediaUrl').value = post.mediaUrl || '';
   postHasPollCheckbox.checked = Boolean(post.pollQuestion && Array.isArray(post.pollOptions) && post.pollOptions.length >= 2);
   pollQuestionInput.value = post.pollQuestion || '';
+  pollMultipleChoicesCheckbox.checked = post.multipleChoices || false;
   pollOptionsContainer.innerHTML = '';
   const options = Array.isArray(post.pollOptions) ? post.pollOptions : [];
   if (options.length > 0) {
     options.forEach(option => addPollOptionInput(option.text || ''));
   }
-  while (pollOptionsContainer.querySelectorAll('.poll-option-input').length < 2) {
+  while (pollOptionsContainer.querySelectorAll('.poll-option-input-wrapper').length < 2) {
     addPollOptionInput();
   }
-  addPollOptionButton.disabled = pollOptionsContainer.querySelectorAll('.poll-option-input').length >= 5;
+  addPollOptionButton.disabled = pollOptionsContainer.querySelectorAll('.poll-option-input-wrapper').length >= 5;
   togglePollFields();
   document.getElementById('addPostButton').textContent = 'Enregistrer les modifications';
   
