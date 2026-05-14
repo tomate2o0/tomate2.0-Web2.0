@@ -1,15 +1,10 @@
 const themeToggle = document.getElementById('themeToggle');
-const sendButton = document.getElementById('sendButton');
 const adminToggle = document.getElementById('adminToggle');
 const adminPanel = document.getElementById('adminPanel');
 const adminLoginButton = document.getElementById('adminLoginButton');
 const postFormContainer = document.getElementById('postFormContainer');
 const addPostButton = document.getElementById('addPostButton');
 const postsGrid = document.getElementById('postsGrid');
-const contactLogin = document.getElementById('contactLogin');
-const contactForm = document.getElementById('contactForm');
-const googleSignin = document.getElementById('googleSignin');
-const googleStatus = document.getElementById('googleStatus');
 const aiToggle = document.getElementById('aiToggle');
 const aiChatPanel = document.getElementById('aiChatPanel');
 const aiClose = document.getElementById('aiClose');
@@ -26,10 +21,19 @@ const startGameButton = document.getElementById('startGame');
 const scoreElement = document.getElementById('score');
 const playerNameInput = document.getElementById('playerName');
 const leaderboardToggle = document.getElementById('leaderboardToggle');
+const moveLeftButton = document.getElementById('moveLeft');
+const rotateButton = document.getElementById('tetrisRotate');
+const moveRightButton = document.getElementById('moveRight');
+const softDropButton = document.getElementById('softDrop');
 const leaderboardList = document.getElementById('leaderboardList');
 const leaderboardPanel = document.getElementById('leaderboardPanel');
 const leaderboardClose = document.getElementById('leaderboardClose');
 const resetLeaderboardButton = document.getElementById('resetLeaderboardButton');
+const postHasPollCheckbox = document.getElementById('postHasPoll');
+const pollFields = document.getElementById('pollFields');
+const pollQuestionInput = document.getElementById('pollQuestion');
+const pollOptionsContainer = document.getElementById('pollOptionsContainer');
+const addPollOptionButton = document.getElementById('addPollOptionButton');
 
 let tetrisPointerState = {
   active: false,
@@ -49,13 +53,10 @@ const adminPassword = '1583ADMIN'; // Mot de passe pour accéder au panneau admi
 let isAdmin = false;
 let posts = [];
 let likedPosts = [];
+let votedPolls = [];
 let editingPostId = null;
-let contactEmail = localStorage.getItem('contactEmail') || '';
-let contactName = localStorage.getItem('contactName') || '';
-
-(function() {
-  emailjs.init('yryXbsEOJe94IMzDt'); // Remplacez par votre clé publique EmailJS
-})();
+let contactEmail = '';
+let contactName = '';
 
 const OPENAI_API_KEY = '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'; // Clé OpenAI non configurée par défaut, utilisation de l’IA locale.
 const OPENAI_MODEL = 'gpt-3.5-turbo';
@@ -70,6 +71,12 @@ function loadPosts() {
   posts = stored ? JSON.parse(stored) : [];
   posts.forEach(post => {
     if (typeof post.likes !== 'number') post.likes = 0;
+    if (typeof post.pollQuestion !== 'string') post.pollQuestion = '';
+    if (!Array.isArray(post.pollOptions)) post.pollOptions = [];
+    post.pollOptions = post.pollOptions.map(option => ({
+      text: option.text || '',
+      votes: typeof option.votes === 'number' ? option.votes : 0,
+    }));
   });
   likedPosts = JSON.parse(localStorage.getItem('likedPosts')) || [];
 }
@@ -116,6 +123,11 @@ function subscribePosts() {
         mediaType: data.mediaType || 'none',
         mediaUrl: data.mediaUrl || '',
         likes: typeof data.likes === 'number' ? data.likes : 0,
+        pollQuestion: data.pollQuestion || '',
+        pollOptions: Array.isArray(data.pollOptions) ? data.pollOptions.map(option => ({
+          text: option.text || '',
+          votes: typeof option.votes === 'number' ? option.votes : 0,
+        })) : [],
         createdAt: data.createdAt || ''
       });
     });
@@ -130,57 +142,123 @@ function saveLikedPosts() {
   localStorage.setItem('likedPosts', JSON.stringify(likedPosts));
 }
 
-function checkContactLogin() {
-  if (contactEmail) {
-    contactLogin.classList.add('hidden');
-    contactForm.classList.remove('hidden');
-    googleStatus.textContent = `Connecté avec ${contactEmail}`;
-  } else {
-    contactLogin.classList.remove('hidden');
-    contactForm.classList.add('hidden');
-    googleStatus.textContent = '';
-  }
+function loadVotedPolls() {
+  votedPolls = JSON.parse(localStorage.getItem('votedPolls')) || [];
 }
 
-function parseJwt(token) {
-  const base64Url = token.split('.')[1];
-  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-  const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
-    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-  }).join(''));
-  return JSON.parse(jsonPayload);
+function saveVotedPolls() {
+  localStorage.setItem('votedPolls', JSON.stringify(votedPolls));
 }
 
-function handleCredentialResponse(response) {
-  const payload = parseJwt(response.credential);
-  if (!payload || !payload.email) {
-    alert('Impossible de récupérer les informations Google. Réessayez.');
-    return;
-  }
-  contactEmail = payload.email;
-  contactName = payload.name || '';
-  localStorage.setItem('contactEmail', contactEmail);
-  localStorage.setItem('contactName', contactName);
-  checkContactLogin();
-}
+function createVideoElement(url) {
+  const container = document.createElement('div');
+  container.style.width = '100%';
+  container.style.height = 'auto';
+  container.style.maxHeight = '500px';
 
-function initGoogleSignIn() {
-  if (!window.google || !google.accounts || !google.accounts.id) {
-    return;
+  // YouTube
+  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    let videoId = '';
+    if (url.includes('youtu.be/')) {
+      videoId = url.split('youtu.be/')[1]?.split('?')[0] || '';
+    } else {
+      videoId = url.split('v=')[1]?.split('&')[0] || '';
+    }
+    if (videoId) {
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'relative';
+      wrapper.style.width = '100%';
+      wrapper.style.paddingBottom = '56.25%';
+      wrapper.style.height = '0';
+      wrapper.style.overflow = 'hidden';
+      wrapper.style.backgroundColor = '#000';
+      
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.youtube.com/embed/${videoId}?autoplay=0`;
+      iframe.style.position = 'absolute';
+      iframe.style.top = '0';
+      iframe.style.left = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = 'none';
+      iframe.setAttribute('frameborder', '0');
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('allow', 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture');
+      iframe.setAttribute('loading', 'lazy');
+      
+      wrapper.appendChild(iframe);
+      container.appendChild(wrapper);
+      return container;
+    }
   }
-  google.accounts.id.initialize({
-    client_id: '682659403479-gdo2tkatobu289bmet22ev55pm5n6j0b.apps.googleusercontent.com',
-    callback: handleCredentialResponse,
-    auto_select: false,
-    cancel_on_tap_outside: true,
-  });
-  google.accounts.id.renderButton(googleSignin, {
-    theme: 'outline',
-    size: 'large',
-    text: 'continue_with',
-    shape: 'rectangular',
-  });
-  google.accounts.id.prompt();
+
+  // TikTok
+  if (url.includes('tiktok.com')) {
+    const videoId = url.split('/video/')[1]?.split('?')[0] || '';
+    if (videoId) {
+      const wrapper = document.createElement('div');
+      wrapper.style.display = 'flex';
+      wrapper.style.justifyContent = 'center';
+      wrapper.style.width = '100%';
+      
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://www.tiktok.com/embed/v2/${videoId}`;
+      iframe.style.width = '100%';
+      iframe.style.height = '600px';
+      iframe.style.maxHeight = '600px';
+      iframe.style.border = 'none';
+      iframe.setAttribute('frameborder', '0');
+      iframe.setAttribute('allow', 'autoplay; encrypted-media; gyroscope; picture-in-picture; web-share');
+      iframe.setAttribute('loading', 'lazy');
+      
+      wrapper.appendChild(iframe);
+      container.appendChild(wrapper);
+      return container;
+    }
+  }
+
+  // Vimeo
+  if (url.includes('vimeo.com')) {
+    const videoId = url.split('/')[3] || '';
+    if (videoId) {
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'relative';
+      wrapper.style.width = '100%';
+      wrapper.style.paddingBottom = '56.25%';
+      wrapper.style.height = '0';
+      wrapper.style.overflow = 'hidden';
+      
+      const iframe = document.createElement('iframe');
+      iframe.src = `https://player.vimeo.com/video/${videoId}`;
+      iframe.style.position = 'absolute';
+      iframe.style.top = '0';
+      iframe.style.left = '0';
+      iframe.style.width = '100%';
+      iframe.style.height = '100%';
+      iframe.style.border = 'none';
+      iframe.setAttribute('frameborder', '0');
+      iframe.setAttribute('allowfullscreen', '');
+      iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
+      iframe.setAttribute('loading', 'lazy');
+      
+      wrapper.appendChild(iframe);
+      container.appendChild(wrapper);
+      return container;
+    }
+  }
+
+  // Vidéo directe (mp4, webm, etc)
+  const video = document.createElement('video');
+  video.src = url;
+  video.controls = true;
+  video.setAttribute('playsinline', '');
+  video.setAttribute('preload', 'metadata');
+  video.style.width = '100%';
+  video.style.height = 'auto';
+  video.style.maxHeight = '500px';
+  video.style.objectFit = 'cover';
+  container.appendChild(video);
+  return container;
 }
 
 function renderPosts() {
@@ -203,11 +281,7 @@ function renderPosts() {
     }
 
     if (post.mediaType === 'video' && post.mediaUrl) {
-      const video = document.createElement('video');
-      video.src = post.mediaUrl;
-      video.controls = true;
-      video.setAttribute('playsinline', '');
-      card.appendChild(video);
+      card.appendChild(createVideoElement(post.mediaUrl));
     }
 
     const content = document.createElement('div');
@@ -227,7 +301,7 @@ function renderPosts() {
 
     const likeBtn = document.createElement('button');
     likeBtn.className = 'like-btn';
-    likeBtn.innerHTML = '♥';
+    likeBtn.innerHTML = likedPosts.includes(post.id) ? '❤️' : '🖤';
     if (likedPosts.includes(post.id)) {
       likeBtn.classList.add('liked');
     }
@@ -242,12 +316,14 @@ function renderPosts() {
 
     const shareBtn = document.createElement('button');
     shareBtn.className = 'share-btn';
-    shareBtn.innerHTML = '➤';
+    shareBtn.innerHTML = '🔗';
     shareBtn.addEventListener('click', () => sharePost(post));
 
     actions.appendChild(shareBtn);
 
     content.appendChild(actions);
+
+    renderPoll(post, content);
 
     // Ajouter les boutons admin si connecté
     if (isAdmin) {
@@ -274,6 +350,108 @@ function renderPosts() {
   });
 }
 
+function hasVotedInPoll(postId) {
+  return votedPolls.includes(postId);
+}
+
+function votePoll(postId, optionIndex) {
+  const post = posts.find(p => p.id === postId);
+  if (!post || !Array.isArray(post.pollOptions) || !post.pollOptions[optionIndex]) return;
+  if (hasVotedInPoll(postId)) {
+    alert('Tu as déjà voté dans ce sondage.');
+    return;
+  }
+  post.pollOptions[optionIndex].votes = (post.pollOptions[optionIndex].votes || 0) + 1;
+  votedPolls.push(postId);
+  if (firestoreReady) {
+    postsCollection.doc(postId).update({ pollOptions: post.pollOptions }).catch(error => {
+      console.error('Erreur mise à jour sondage Firestore :', error);
+    });
+  }
+  savePosts();
+  saveVotedPolls();
+  renderPosts();
+}
+
+function renderPoll(post, content) {
+  if (!post.pollQuestion || !Array.isArray(post.pollOptions) || post.pollOptions.length === 0) {
+    return;
+  }
+
+  const pollSection = document.createElement('div');
+  pollSection.className = 'poll-section';
+
+  const question = document.createElement('p');
+  question.className = 'poll-question';
+  question.textContent = post.pollQuestion;
+  pollSection.appendChild(question);
+
+  const totalVotes = post.pollOptions.reduce((sum, option) => sum + (typeof option.votes === 'number' ? option.votes : 0), 0);
+  const voted = hasVotedInPoll(post.id);
+
+  post.pollOptions.forEach((option, index) => {
+    const optionWrapper = document.createElement('div');
+    optionWrapper.className = 'poll-option';
+
+    const voteButton = document.createElement('button');
+    voteButton.type = 'button';
+    voteButton.className = 'poll-vote-btn button';
+    voteButton.textContent = option.text || `Option ${index + 1}`;
+    voteButton.disabled = voted;
+    voteButton.addEventListener('click', () => votePoll(post.id, index));
+    optionWrapper.appendChild(voteButton);
+
+    const percent = totalVotes > 0 ? Math.round((option.votes / totalVotes) * 100) : 0;
+    const result = document.createElement('div');
+    result.className = 'poll-result';
+    result.innerHTML = `
+      <div class="poll-result-label">${option.votes || 0} vote(s) · ${percent}%</div>
+      <div class="poll-bar"><div class="poll-bar-fill" style="width:${percent}%;"></div></div>
+    `;
+    optionWrapper.appendChild(result);
+    pollSection.appendChild(optionWrapper);
+  });
+
+  if (!voted) {
+    const hint = document.createElement('p');
+    hint.className = 'poll-hint';
+    hint.textContent = 'Choisis ton option préférée et vote pour le sondage.';
+    pollSection.appendChild(hint);
+  }
+
+  content.appendChild(pollSection);
+}
+
+function addPollOptionInput(value = '') {
+  const currentCount = pollOptionsContainer.querySelectorAll('.poll-option-input').length;
+  if (currentCount >= 5) {
+    return;
+  }
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'poll-option-input';
+  input.value = value;
+  input.placeholder = `Option ${currentCount + 1}`;
+  pollOptionsContainer.appendChild(input);
+  updatePollOptionPlaceholders();
+  addPollOptionButton.disabled = pollOptionsContainer.querySelectorAll('.poll-option-input').length >= 5;
+}
+
+function updatePollOptionPlaceholders() {
+  pollOptionsContainer.querySelectorAll('.poll-option-input').forEach((input, index) => {
+    input.placeholder = `Option ${index + 1}`;
+  });
+}
+
+function togglePollFields() {
+  if (!pollFields) return;
+  if (postHasPollCheckbox.checked) {
+    pollFields.classList.remove('hidden');
+  } else {
+    pollFields.classList.add('hidden');
+  }
+}
+
 function showAdminPanel() {
   adminPanel.classList.toggle('hidden');
 }
@@ -293,11 +471,34 @@ function addPost() {
   const text = document.getElementById('postText').value.trim();
   const mediaType = document.getElementById('postMediaType').value;
   const mediaUrl = document.getElementById('postMediaUrl').value.trim();
+  const hasPoll = postHasPollCheckbox.checked;
+  const pollQuestion = hasPoll ? pollQuestionInput.value.trim() : '';
+  const pollOptions = hasPoll
+    ? Array.from(document.querySelectorAll('.poll-option-input'))
+        .map(input => input.value.trim())
+        .filter(option => option)
+        .slice(0, 5)
+        .map(option => ({ text: option, votes: 0 }))
+    : [];
 
-  if (!title && !text && mediaType === 'none') {
-    alert('Ajoute au moins un titre, du texte ou un média.');
+  if (!title && !text && mediaType === 'none' && !hasPoll) {
+    alert('Ajoute au moins un titre, du texte, un média ou un sondage.');
     return;
   }
+
+  if (hasPoll && (!pollQuestion || pollOptions.length < 2)) {
+    alert('Pour ajouter un sondage, indique une question et au moins deux options valides.');
+    return;
+  }
+
+  const postData = {
+    title,
+    text,
+    mediaType,
+    mediaUrl,
+    pollQuestion,
+    pollOptions,
+  };
 
   if (editingPostId) {
     // Modification d'un post existant
@@ -305,18 +506,10 @@ function addPost() {
     if (postIndex !== -1) {
       posts[postIndex] = {
         ...posts[postIndex],
-        title,
-        text,
-        mediaType,
-        mediaUrl,
+        ...postData,
       };
       if (firestoreReady) {
-        postsCollection.doc(editingPostId).update({
-          title,
-          text,
-          mediaType,
-          mediaUrl,
-        }).catch(error => {
+        postsCollection.doc(editingPostId).update(postData).catch(error => {
           console.error('Erreur mise à jour post Firestore :', error);
         });
       }
@@ -327,22 +520,16 @@ function addPost() {
     // Création d'un nouveau post
     const newPost = {
       id: Date.now().toString(),
-      title,
-      text,
-      mediaType,
-      mediaUrl,
       likes: 0,
       createdAt: new Date().toISOString(),
+      ...postData,
     };
     posts.unshift(newPost);
     if (firestoreReady) {
       postsCollection.doc(newPost.id).set({
-        title,
-        text,
-        mediaType,
-        mediaUrl,
         likes: 0,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        ...postData,
       }).catch(error => {
         console.error('Erreur création post Firestore :', error);
       });
@@ -355,6 +542,13 @@ function addPost() {
   document.getElementById('postText').value = '';
   document.getElementById('postMediaType').value = 'none';
   document.getElementById('postMediaUrl').value = '';
+  postHasPollCheckbox.checked = false;
+  togglePollFields();
+  pollQuestionInput.value = '';
+  pollOptionsContainer.innerHTML = '';
+  addPollOptionInput();
+  addPollOptionInput();
+  addPollOptionButton.disabled = false;
 }
 
 function startEditPost(postId) {
@@ -366,6 +560,18 @@ function startEditPost(postId) {
   document.getElementById('postText').value = post.text || '';
   document.getElementById('postMediaType').value = post.mediaType || 'none';
   document.getElementById('postMediaUrl').value = post.mediaUrl || '';
+  postHasPollCheckbox.checked = Boolean(post.pollQuestion && Array.isArray(post.pollOptions) && post.pollOptions.length >= 2);
+  pollQuestionInput.value = post.pollQuestion || '';
+  pollOptionsContainer.innerHTML = '';
+  const options = Array.isArray(post.pollOptions) ? post.pollOptions : [];
+  if (options.length > 0) {
+    options.forEach(option => addPollOptionInput(option.text || ''));
+  }
+  while (pollOptionsContainer.querySelectorAll('.poll-option-input').length < 2) {
+    addPollOptionInput();
+  }
+  addPollOptionButton.disabled = pollOptionsContainer.querySelectorAll('.poll-option-input').length >= 5;
+  togglePollFields();
   document.getElementById('addPostButton').textContent = 'Enregistrer les modifications';
   
   // Scroll vers le formulaire
@@ -1202,34 +1408,15 @@ themeToggle.addEventListener('click', () => {
   updateButtonText();
 });
 
-sendButton.addEventListener('click', () => {
-  if (!contactEmail) {
-    alert('Veuillez vous connecter avec Google.');
-    return;
-  }
-  const name = document.getElementById('name').value.trim();
-  const message = document.getElementById('message').value.trim();
-  if (!name || !message) {
-    alert('Veuillez remplir tous les champs.');
-    return;
-  }
-  emailjs.send('service_2xb0xvc', 'template_vvnsjwy', {
-    from_name: name || contactName,
-    from_email: contactEmail,
-    message: message,
-    to_email: 'fntomate3.0@gmail.com'
-  }).then(() => {
-    alert('Message envoyé avec succès !');
-    document.getElementById('name').value = '';
-    document.getElementById('message').value = '';
-  }).catch((error) => {
-    alert('Erreur lors de l\'envoi : ' + (error.text || 'Une erreur est survenue.'));
-  });
-});
-
 adminToggle.addEventListener('click', showAdminPanel);
 adminLoginButton.addEventListener('click', loginAdmin);
 addPostButton.addEventListener('click', addPost);
+if (postHasPollCheckbox) {
+  postHasPollCheckbox.addEventListener('change', togglePollFields);
+}
+if (addPollOptionButton) {
+  addPollOptionButton.addEventListener('click', () => addPollOptionInput());
+}
 aiToggle.addEventListener('click', openAiChat);
 if (aiClose) {
   aiClose.addEventListener('click', (event) => {
@@ -1267,6 +1454,38 @@ startGameButton.addEventListener('click', () => {
   }
 });
 
+if (moveLeftButton) {
+  moveLeftButton.addEventListener('click', () => {
+    if (!gameInterval) return;
+    movePiece(-1, 0);
+    drawBoard();
+  });
+}
+
+if (rotateButton) {
+  rotateButton.addEventListener('click', () => {
+    if (!gameInterval) return;
+    rotatePiece();
+    drawBoard();
+  });
+}
+
+if (moveRightButton) {
+  moveRightButton.addEventListener('click', () => {
+    if (!gameInterval) return;
+    movePiece(1, 0);
+    drawBoard();
+  });
+}
+
+if (softDropButton) {
+  softDropButton.addEventListener('click', () => {
+    if (!gameInterval) return;
+    movePiece(0, 1);
+    drawBoard();
+  });
+}
+
 if (leaderboardToggle) {
   leaderboardToggle.addEventListener('click', () => {
     if (!leaderboardPanel) return;
@@ -1283,9 +1502,9 @@ if (leaderboardClose) {
 
 // Initialisation
 loadPosts();
+loadVotedPolls();
 renderPosts();
 updateButtonText();
-checkContactLogin();
 loadTetrisLeaderboard();
 loadTetrisPlayer();
 if (playerNameInput) {
@@ -1294,7 +1513,6 @@ if (playerNameInput) {
 renderTetrisLeaderboard();
 
 window.addEventListener('load', () => {
-  initGoogleSignIn();
   initFirebase();
   initPanelInteractions();
 });
