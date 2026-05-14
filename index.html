@@ -10,7 +10,11 @@
   <header class="site-header">
     <div class="container header-content">
       <h1>Bienvenue sur mon site web</h1>
-      <button id="themeToggle" class="theme-toggle">Mode sombre</button>
+      <div class="header-actions">
+        <button id="aiToggle" class="button ai-toggle-button">IA (bêta)</button>
+        <button id="gamesToggle" class="button games-toggle-button">Tetris Game</button>
+        <button id="themeToggle" class="theme-toggle">Mode sombre</button>
+      </div>
     </div>
   </header>
 
@@ -78,6 +82,61 @@
       </form>
     </section>
   </main>
+
+  <div id="aiChatPanel" class="ai-chat-panel hidden">
+    <div class="ai-chat-header">
+      <div>
+        <h2>Chat IA</h2>
+        <p>Pose une question simple ou envoie une image.</p>
+      </div>
+      <button id="aiClose" type="button" class="button button-secondary" onclick="closeAiChat(); return false;">Fermer</button>
+    </div>
+    <div id="aiMessages" class="ai-messages"></div>
+    <div class="ai-chat-footer">
+      <label class="ai-file-label" for="aiFileInput">+ Image</label>
+      <input id="aiFileInput" type="file" accept="image/*" />
+      <textarea id="aiInput" rows="3" placeholder="Texte limité et clair..." ></textarea>
+      <button id="aiSendButton" class="button">Envoyer</button>
+    </div>
+    <p id="aiNote" class="ai-note">L’IA répond à des demandes simples et respectueuses. Pas de questions étranges.</p>
+    <div class="panel-resizer"></div>
+  </div>
+
+  <div id="gamesPanel" class="games-panel hidden">
+    <div class="games-header">
+      <div>
+        <h2>Mini Jeux - Tetris</h2>
+        <p>Joue au Tetris ! Utilise les flèches pour bouger et tourner.</p>
+      </div>
+      <button id="gamesClose" type="button" class="button button-secondary" onclick="closeGames(); return false;">Fermer</button>
+    </div>
+    <div class="games-info">
+      <label for="playerName">Nom du joueur</label>
+      <input id="playerName" type="text" placeholder="Ton nom" />
+    </div>
+    <canvas id="tetrisCanvas" width="300" height="600"></canvas>
+    <div class="games-footer">
+      <p id="score">Score: 0</p>
+      <div class="games-actions">
+        <button id="startGame" class="button">Démarrer</button>
+        <button id="leaderboardToggle" class="button button-secondary">Voir classement</button>
+      </div>
+    </div>
+    <div class="panel-resizer"></div>
+  </div>
+
+  <div id="leaderboardPanel" class="leaderboard-panel hidden">
+    <div class="games-header">
+      <div>
+        <h2>Classement Tetris</h2>
+      </div>
+      <button id="leaderboardClose" type="button" class="button button-secondary">Fermer</button>
+    </div>
+    <div class="leaderboard-content">
+      <ol id="leaderboardList"></ol>
+    </div>
+    <div class="panel-resizer"></div>
+  </div>
 
   <footer class="site-footer">
     <p>© 2026 tomate2.0 Web. tout droit réservé.</p>
