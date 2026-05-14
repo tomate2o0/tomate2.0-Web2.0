@@ -30,8 +30,22 @@ const leaderboardList = document.getElementById('leaderboardList');
 const leaderboardPanel = document.getElementById('leaderboardPanel');
 const leaderboardClose = document.getElementById('leaderboardClose');
 
+let tetrisPointerState = {
+  active: false,
+  startX: 0,
+  startY: 0,
+  lastX: 0,
+  lastY: 0,
+  moved: false,
+};
+const leaderboardList = document.getElementById('leaderboardList');
+const leaderboardPanel = document.getElementById('leaderboardPanel');
+const leaderboardClose = document.getElementById('leaderboardClose');
+
 const TETRIS_LEADERBOARD_KEY = 'tetrisLeaderboard';
+const TETRIS_PLAYER_KEY = 'tetrisPlayer';
 let tetrisLeaderboard = [];
+let tetrisPlayer = null;
 
 const adminPassword = '1583ADMIN'; // Mot de passe pour accéder au panneau admin (à changer pour plus de sécurité)
 let isAdmin = false;
@@ -45,7 +59,7 @@ let contactName = localStorage.getItem('contactName') || '';
   emailjs.init('yryXbsEOJe94IMzDt'); // Remplacez par votre clé publique EmailJS
 })();
 
-const OPENAI_API_KEY = ''; // Clé OpenAI non configurée par défaut, utilisation de l’IA locale.
+const OPENAI_API_KEY = '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'; // Clé OpenAI non configurée par défaut, utilisation de l’IA locale.
 const OPENAI_MODEL = 'gpt-3.5-turbo';
 
 function updateButtonText() {
@@ -157,7 +171,7 @@ function initGoogleSignIn() {
     return;
   }
   google.accounts.id.initialize({
-    client_id: '609638615194-h59lhro3avtov0biuneh75u9h4394k55.apps.googleusercontent.com',
+    client_id: '682659403479-gdo2tkatobu289bmet22ev55pm5n6j0b.apps.googleusercontent.com',
     callback: handleCredentialResponse,
     auto_select: false,
     cancel_on_tap_outside: true,
@@ -445,6 +459,50 @@ function saveTetrisLeaderboard() {
   localStorage.setItem(TETRIS_LEADERBOARD_KEY, JSON.stringify(tetrisLeaderboard));
 }
 
+function loadTetrisPlayer() {
+  try {
+    const stored = localStorage.getItem(TETRIS_PLAYER_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      const id = parsed && parsed.id ? parsed.id : createNewTetrisPlayer().id;
+      const name = parsed && typeof parsed.name === 'string' ? parsed.name : 'Joueur';
+      tetrisPlayer = {
+        id,
+        name: name.trim().slice(0, 20) || 'Joueur',
+      };
+    } else {
+      tetrisPlayer = createNewTetrisPlayer();
+    }
+  } catch (error) {
+    console.warn('Impossible de charger le joueur Tetris :', error);
+    tetrisPlayer = createNewTetrisPlayer();
+  }
+  localStorage.setItem(TETRIS_PLAYER_KEY, JSON.stringify(tetrisPlayer));
+  if (playerNameInput) {
+    playerNameInput.value = tetrisPlayer.name;
+  }
+}
+
+function createNewTetrisPlayer() {
+  return {
+    id: `device-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    name: 'Joueur',
+  };
+}
+
+function saveTetrisPlayerName(name) {
+  if (!tetrisPlayer) {
+    loadTetrisPlayer();
+  }
+  const trimmedName = (name || 'Joueur').trim().slice(0, 20) || 'Joueur';
+  tetrisPlayer.name = trimmedName;
+  localStorage.setItem(TETRIS_PLAYER_KEY, JSON.stringify(tetrisPlayer));
+  if (playerNameInput) {
+    playerNameInput.value = trimmedName;
+  }
+  return trimmedName;
+}
+
 function renderTetrisLeaderboard() {
   if (!leaderboardList) return;
   leaderboardList.innerHTML = '';
@@ -462,8 +520,27 @@ function renderTetrisLeaderboard() {
 }
 
 function updateTetrisLeaderboard(name, score) {
-  const trimmedName = (name || 'Joueur').trim().slice(0, 20) || 'Joueur';
-  tetrisLeaderboard.push({ name: trimmedName, score });
+  const trimmedName = saveTetrisPlayerName(name);
+  if (!tetrisPlayer) {
+    loadTetrisPlayer();
+  }
+  const playerId = tetrisPlayer.id;
+  let existingIndex = tetrisLeaderboard.findIndex(entry => entry.id === playerId);
+  if (existingIndex === -1) {
+    existingIndex = tetrisLeaderboard.findIndex(entry => entry.name === trimmedName && !entry.id);
+  }
+
+  if (existingIndex !== -1) {
+    const existingEntry = tetrisLeaderboard[existingIndex];
+    existingEntry.name = trimmedName;
+    existingEntry.id = playerId;
+    if (score > existingEntry.score) {
+      existingEntry.score = score;
+    }
+  } else {
+    tetrisLeaderboard.push({ id: playerId, name: trimmedName, score });
+  }
+
   tetrisLeaderboard.sort((a, b) => b.score - a.score);
   tetrisLeaderboard = tetrisLeaderboard.slice(0, 5);
   saveTetrisLeaderboard();
@@ -472,7 +549,7 @@ function updateTetrisLeaderboard(name, score) {
 
 function panelDragStart(event) {
   if (event.button !== 0) return;
-  const panel = event.currentTarget.closest('.ai-chat-panel, .games-panel');
+  const panel = event.currentTarget.closest('.ai-chat-panel, .games-panel, .leaderboard-panel');
   if (!panel) return;
 
   const rect = panel.getBoundingClientRect();
@@ -493,7 +570,7 @@ function panelDragStart(event) {
 function panelResizeStart(event) {
   event.stopPropagation();
   if (event.button !== 0) return;
-  const panel = event.currentTarget.closest('.ai-chat-panel, .games-panel');
+  const panel = event.currentTarget.closest('.ai-chat-panel, .games-panel, .leaderboard-panel');
   if (!panel) return;
 
   const rect = panel.getBoundingClientRect();
@@ -967,6 +1044,57 @@ function gameOver() {
   alert('Game Over! Score: ' + score);
 }
 
+function onTetrisPointerDown(event) {
+  if (!gameInterval || !tetrisCanvas) return;
+  event.preventDefault();
+  tetrisPointerState.active = true;
+  tetrisPointerState.startX = event.clientX;
+  tetrisPointerState.startY = event.clientY;
+  tetrisPointerState.lastX = event.clientX;
+  tetrisPointerState.lastY = event.clientY;
+  tetrisPointerState.moved = false;
+  tetrisCanvas.setPointerCapture(event.pointerId);
+}
+
+function onTetrisPointerMove(event) {
+  if (!tetrisPointerState.active) return;
+  const dx = event.clientX - tetrisPointerState.lastX;
+  const dy = event.clientY - tetrisPointerState.lastY;
+  if (Math.abs(dx) >= 20) {
+    movePiece(dx > 0 ? 1 : -1, 0);
+    tetrisPointerState.lastX = event.clientX;
+    tetrisPointerState.moved = true;
+    drawBoard();
+  } else if (dy >= 25) {
+    movePiece(0, 1);
+    tetrisPointerState.lastY = event.clientY;
+    tetrisPointerState.moved = true;
+    drawBoard();
+  }
+}
+
+function onTetrisPointerUp(event) {
+  if (!tetrisPointerState.active) return;
+  const totalDx = event.clientX - tetrisPointerState.startX;
+  const totalDy = event.clientY - tetrisPointerState.startY;
+  if (!tetrisPointerState.moved && Math.abs(totalDx) < 15 && Math.abs(totalDy) < 15) {
+    rotatePiece();
+    drawBoard();
+  }
+  tetrisPointerState.active = false;
+  tetrisPointerState.moved = false;
+  if (tetrisCanvas && tetrisCanvas.hasPointerCapture(event.pointerId)) {
+    tetrisCanvas.releasePointerCapture(event.pointerId);
+  }
+}
+
+if (tetrisCanvas) {
+  tetrisCanvas.addEventListener('pointerdown', onTetrisPointerDown);
+  tetrisCanvas.addEventListener('pointermove', onTetrisPointerMove);
+  tetrisCanvas.addEventListener('pointerup', onTetrisPointerUp);
+  tetrisCanvas.addEventListener('pointercancel', onTetrisPointerUp);
+}
+
 // Controls
 document.addEventListener('keydown', (e) => {
   if (!gameInterval) return;
@@ -1063,11 +1191,11 @@ sendButton.addEventListener('click', () => {
     alert('Veuillez remplir tous les champs.');
     return;
   }
-  emailjs.send('YOUR_SERVICE_ID', 'YOUR_TEMPLATE_ID', {
+  emailjs.send('service_2xb0xvc', 'template_vvnsjwy', {
     from_name: name || contactName,
     from_email: contactEmail,
     message: message,
-    to_email: 'lager.thomas38360@gmail.com'
+    to_email: 'fntomate3.0@gmail.com'
   }).then(() => {
     alert('Message envoyé avec succès !');
     document.getElementById('name').value = '';
@@ -1134,6 +1262,10 @@ renderPosts();
 updateButtonText();
 checkContactLogin();
 loadTetrisLeaderboard();
+loadTetrisPlayer();
+if (playerNameInput) {
+  playerNameInput.addEventListener('blur', () => saveTetrisPlayerName(playerNameInput.value));
+}
 renderTetrisLeaderboard();
 
 window.addEventListener('load', () => {

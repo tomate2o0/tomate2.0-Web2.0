@@ -561,7 +561,7 @@ body {
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 .games-footer {
@@ -624,5 +624,28 @@ textarea:focus {
   .header-content {
     flex-direction: column;
     align-items: stretch;
+  }
+  .ai-chat-panel,
+  .games-panel,
+  .leaderboard-panel {
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    border-radius: 0 !important;
+    margin: 0;
+    box-shadow: none;
+  }
+  .ai-chat-panel .ai-chat-footer,
+  .games-panel .games-footer,
+  .leaderboard-panel .leaderboard-content {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .panel-resizer {
+    display: none !important;
   }
 }
