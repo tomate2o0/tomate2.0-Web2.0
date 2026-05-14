@@ -53,6 +53,21 @@
           <label for="postMediaUrl">URL de l'image ou de la vidéo</label>
           <input id="postMediaUrl" type="url" placeholder="https://..." />
 
+          <label class="checkbox-label" for="postHasPoll">
+            <input id="postHasPoll" type="checkbox" /> Ajouter un sondage
+          </label>
+
+          <div id="pollFields" class="poll-fields hidden">
+            <label for="pollQuestion">Question du sondage</label>
+            <input id="pollQuestion" type="text" placeholder="Par exemple : Quel est ton jeu préféré ?" />
+            <div id="pollOptionsContainer" class="poll-options-container">
+              <label>Options de sondage</label>
+              <input class="poll-option-input" type="text" placeholder="Option 1" />
+              <input class="poll-option-input" type="text" placeholder="Option 2" />
+            </div>
+            <button id="addPollOptionButton" type="button" class="button button-secondary">Ajouter une option</button>
+          </div>
+
           <button type="button" id="addPostButton" class="button">Ajouter le post</button>
           <p class="admin-hint">.</p>
         </div>
@@ -61,27 +76,6 @@
       </div>
 
       <div id="postsGrid" class="posts-grid"></div>
-    </section>
-
-    <section class="contact container" id="contact">
-      <div>
-        <h2>Contactez-moi</h2>
-        <p>Envoyez un message au créateur du site.</p>
-      </div>
-      <div id="contactLogin" class="contact-login">
-        <p>Connectez-vous d'abord avec un compte Google pour pouvoir envoyer un message.</p>
-        <div id="googleSignin"></div>
-        <p id="googleStatus" class="contact-status"></p>
-      </div>
-      <form id="contactForm" class="hidden">
-        <label for="name">Nom</label>
-        <input id="name" type="text" placeholder="Votre nom" />
-
-        <label for="message">Message</label>
-        <textarea id="message" rows="5" placeholder="Votre demande..."></textarea>
-
-        <button type="button" id="sendButton" class="button">Envoyer</button>
-      </form>
     </section>
   </main>
 
@@ -112,17 +106,23 @@
       </div>
       <button id="gamesClose" type="button" class="button button-secondary" onclick="closeGames(); return false;">Fermer</button>
     </div>
-    <div class="games-info">
-      <label for="playerName">Nom du joueur</label>
-      <input id="playerName" type="text" placeholder="Ton nom" />
-    </div>
-    <canvas id="tetrisCanvas" width="300" height="600"></canvas>
-    <div class="games-footer">
+    <div class="games-topbar">
       <p id="score">Score: 0</p>
       <div class="games-actions">
         <button id="startGame" class="button">Démarrer</button>
         <button id="leaderboardToggle" class="button button-secondary">Voir classement</button>
       </div>
+    </div>
+    <div class="games-info">
+      <label for="playerName">Nom du joueur</label>
+      <input id="playerName" type="text" placeholder="Ton nom" />
+    </div>
+    <canvas id="tetrisCanvas" width="300" height="600"></canvas>
+    <div class="mobile-controls">
+      <button id="moveLeft" type="button" class="button button-secondary">←</button>
+      <button id="tetrisRotate" type="button" class="button button-secondary">⟳</button>
+      <button id="moveRight" type="button" class="button button-secondary">→</button>
+      <button id="softDrop" type="button" class="button button-secondary">↓</button>
     </div>
     <div class="panel-resizer"></div>
   </div>
@@ -146,8 +146,6 @@
 
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
