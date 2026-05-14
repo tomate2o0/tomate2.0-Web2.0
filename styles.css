@@ -523,6 +523,7 @@ body {
   z-index: 1000;
   min-width: 260px;
   min-height: 240px;
+  overflow-y: auto;
 }
 
 .panel-draggable {
@@ -783,7 +784,7 @@ textarea:focus {
   }
   #tetrisCanvas {
     width: 200px;
-    height: 400px;
+    height: 350px;
   }
   .games-topbar {
     flex-direction: column;
