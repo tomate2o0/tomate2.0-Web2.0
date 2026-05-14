@@ -38,9 +38,6 @@ let tetrisPointerState = {
   lastY: 0,
   moved: false,
 };
-const leaderboardList = document.getElementById('leaderboardList');
-const leaderboardPanel = document.getElementById('leaderboardPanel');
-const leaderboardClose = document.getElementById('leaderboardClose');
 
 const TETRIS_LEADERBOARD_KEY = 'tetrisLeaderboard';
 const TETRIS_PLAYER_KEY = 'tetrisPlayer';
