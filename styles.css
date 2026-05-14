@@ -231,9 +231,10 @@ body {
   border-color: rgba(37, 99, 235, 0.3);
 }
 
-.poll-vote-btn:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
+.poll-vote-btn.voted {
+  background: var(--primary);
+  color: var(--primary-contrast);
+  border-color: var(--primary);
 }
 
 .poll-result {
@@ -762,10 +763,10 @@ textarea:focus {
     box-shadow: none;
   }
   .games-panel {
-    top: auto !important;
+    top: 1rem !important;
     left: 1rem !important;
     right: 1rem !important;
-    bottom: 1rem !important;
+    bottom: auto !important;
     width: auto !important;
     max-width: 320px !important;
     height: auto !important;
