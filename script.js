@@ -29,6 +29,7 @@ const leaderboardToggle = document.getElementById('leaderboardToggle');
 const leaderboardList = document.getElementById('leaderboardList');
 const leaderboardPanel = document.getElementById('leaderboardPanel');
 const leaderboardClose = document.getElementById('leaderboardClose');
+const resetLeaderboardButton = document.getElementById('resetLeaderboardButton');
 
 let tetrisPointerState = {
   active: false,
@@ -1163,13 +1164,37 @@ function loginAdmin() {
   const passwordInput = document.getElementById('adminPassword').value;
   if (passwordInput === adminPassword) {
     isAdmin = true;
-    showPostForm();
+    updateAdminUI();
     adminLoginButton.textContent = 'Admin connecté';
     adminLoginButton.disabled = true;
     document.getElementById('adminPassword').disabled = true;
     return;
   }
   alert('Mot de passe incorrect.');
+}
+
+function updateAdminUI() {
+  if (!isAdmin) return;
+  showPostForm();
+  if (resetLeaderboardButton) {
+    resetLeaderboardButton.classList.remove('hidden');
+  }
+}
+
+function resetTetrisLeaderboard() {
+  if (!isAdmin) {
+    alert('Seul l’admin peut réinitialiser le classement.');
+    return;
+  }
+
+  if (!confirm('Voulez-vous vraiment effacer tous les scores du classement Tetris ?')) {
+    return;
+  }
+
+  tetrisLeaderboard = [];
+  saveTetrisLeaderboard();
+  renderTetrisLeaderboard();
+  alert('Le classement Tetris a été réinitialisé.');
 }
 
 themeToggle.addEventListener('click', () => {
@@ -1226,6 +1251,9 @@ aiFileInput.addEventListener('change', () => {
     aiFileInput.previousElementSibling.textContent = 'Image sélectionnée';
   }
 });
+if (resetLeaderboardButton) {
+  resetLeaderboardButton.addEventListener('click', resetTetrisLeaderboard);
+}
 gamesToggle.addEventListener('click', openGames);
 gamesClose.addEventListener('click', (event) => {
   event.preventDefault();
